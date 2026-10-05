@@ -1,27 +1,6 @@
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
-from .models import Book, BookAttachment, Meeting, Review, User, Vote
 
-
-@admin.register(User)
-class CustomUserAdmin(UserAdmin):
-    list_display = ('login', 'email', 'role', 'is_staff', 'is_active')
-    list_filter = ('role', 'is_staff', 'is_active')
-    search_fields = ('login', 'email', 'first_name', 'last_name')
-    ordering = ('login',)
-
-    fieldsets = (
-        (None, {'fields': ('login', 'password')}),
-        ('Персональные данные', {'fields': ('first_name', 'last_name', 'email')}),
-        ('Права доступа', {'fields': ('role', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
-        ('Важные даты', {'fields': ('last_login', 'date_joined')}),
-    )
-    add_fieldsets = (
-        (None, {
-            'classes': ('wide',),
-            'fields': ('login', 'email', 'role', 'password1', 'password2'),
-        }),
-    )
+from .models import Book, BookAttachment, Meeting, Review, Vote
 
 
 class BookAttachmentInline(admin.TabularInline):
@@ -47,14 +26,14 @@ class BookAttachmentAdmin(admin.ModelAdmin):
 class VoteAdmin(admin.ModelAdmin):
     list_display = ('book', 'user', 'rating', 'updated_at')
     list_filter = ('book__year', 'rating')
-    search_fields = ('user__login', 'book__title')
+    search_fields = ('user__email', 'book__title')
 
 
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
     list_display = ('book', 'user', 'created_at', 'text_snippet')
     list_filter = ('book__year', 'created_at')
-    search_fields = ('user__login', 'book__title', 'text')
+    search_fields = ('user__email', 'book__title', 'text')
 
     def text_snippet(self, obj):
         return obj.text[:50] + '...' if len(obj.text) > 50 else obj.text

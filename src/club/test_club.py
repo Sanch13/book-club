@@ -1,6 +1,8 @@
 import pytest
 from django.urls import reverse
-from club.models import Book, Review, User, Vote
+
+from club.models import Book, Review, Vote
+from user.models import User
 
 
 @pytest.mark.django_db
@@ -14,8 +16,8 @@ class TestBookClub:
         )
         assert book.average_rating is None
 
-        user1 = User.objects.create_user(login='user1', password='password')
-        user2 = User.objects.create_user(login='user2', password='password')
+        user1 = User.objects.create_user(email='user1@miran.local', password='password')
+        user2 = User.objects.create_user(email='user2@miran.local', password='password')
 
         Vote.objects.create(book=book, user=user1, rating=8)
         Vote.objects.create(book=book, user=user2, rating=10)
@@ -24,8 +26,8 @@ class TestBookClub:
         assert book.average_rating == 9.0
 
     def test_review_permissions(self, client):
-        user1 = User.objects.create_user(login='author1', password='password')
-        user2 = User.objects.create_user(login='author2', password='password')
+        user1 = User.objects.create_user(email='author1@miran.local', password='password')
+        user2 = User.objects.create_user(email='author2@miran.local', password='password')
         book = Book.objects.create(
             month=2,
             title='Книга отзывов',
@@ -52,7 +54,7 @@ class TestBookClub:
         assert review.text == 'Обновленный отзыв'
 
     def test_voting_view(self, client):
-        user = User.objects.create_user(login='voter1', password='password')
+        user = User.objects.create_user(email='voter1@miran.local', password='password')
         book = Book.objects.create(
             month=3,
             title='Книга голосования',
@@ -72,3 +74,47 @@ class TestBookClub:
         vote.refresh_from_db()
         assert vote.rating == 5
         assert Vote.objects.filter(book=book, user=user).count() == 1
+
+
+@pytest.mark.django_db
+class TestAuth:
+    def test_registration_creates_user_and_logs_in(self, client):
+        response = client.post(
+            reverse('register'),
+            {'email': 'new@miran.local', 'password': 'strongpass123'},
+        )
+        assert response.status_code == 302
+        assert response.url == reverse('index')
+        user = User.objects.get(email='new@miran.local')
+        user.check_password('strongpass123')
+        assert user.role == User.Role.PARTICIPANT
+
+    def test_registration_rejects_duplicate_email(self, client):
+        User.objects.create_user(email='dup@miran.local', password='password')
+        response = client.post(
+            reverse('register'),
+            {'email': 'dup@miran.local', 'password': 'strongpass123'},
+        )
+        assert response.status_code == 200
+        assert User.objects.filter(email='dup@miran.local').count() == 1
+        assert 'уже зарегистрирован' in response.content.decode()
+
+    def test_login_by_email(self, client):
+        user = User.objects.create_user(email='login@miran.local', password='password123')
+        response = client.post(
+            reverse('login'),
+            {'username': 'login@miran.local', 'password': 'password123'},
+        )
+        assert response.status_code == 302
+        assert response.url == reverse('index')
+        user.refresh_from_db()
+        assert user.last_login is not None
+
+    def test_login_rejects_wrong_password(self, client):
+        User.objects.create_user(email='login@miran.local', password='password123')
+        response = client.post(
+            reverse('login'),
+            {'username': 'login@miran.local', 'password': 'wrongpass'},
+        )
+        assert response.status_code == 200
+        assert 'Неверный email или пароль' in response.content.decode()

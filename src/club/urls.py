@@ -1,5 +1,5 @@
-from django.contrib.auth.views import LogoutView
 from django.urls import path
+
 from . import views
 
 urlpatterns = [
@@ -8,6 +8,4 @@ urlpatterns = [
     path('books/', views.book_list_view, name='books'),  # alias
     path('books/<int:pk>/', views.book_detail_view, name='book_detail'),
     path('reviews/<int:review_id>/edit/', views.edit_review_view, name='edit_review'),
-    path('login/', views.CustomLoginView.as_view(), name='login'),
-    path('logout/', LogoutView.as_view(), name='logout'),
 ]

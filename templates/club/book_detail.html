@@ -107,7 +107,7 @@
             <div class="flex flex-wrap gap-2">
                 {% for vote in votes %}
                 <div class="bg-gray-50 border px-3 py-1.5 rounded-xl text-sm flex items-center space-x-2">
-                    <span class="font-semibold text-gray-800">{{ vote.user.login }}</span>
+                    <span class="font-semibold text-gray-800">{{ vote.user.email }}</span>
                     <span class="bg-[#A2D813] text-gray-900 px-2 py-0.5 rounded-full font-bold text-xs">{{ vote.rating }}</span>
                 </div>
                 {% endfor %}
@@ -138,7 +138,7 @@
             {% for review in reviews %}
             <div class="p-5 rounded-xl bg-gray-50 border border-gray-100 space-y-2">
                 <div class="flex justify-between items-center text-xs text-gray-500">
-                    <span class="font-bold text-gray-900 text-sm">👤 {{ review.user.login }}</span>
+                    <span class="font-bold text-gray-900 text-sm">👤 {{ review.user.email }}</span>
                     <span>{{ review.created_at|date:"d.m.Y H:i" }}</span>
                 </div>
                 <p class="text-gray-700 whitespace-pre-line text-sm">{{ review.text }}</p>

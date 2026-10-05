@@ -6,7 +6,7 @@ from django.urls import include, path
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('club.urls')),
-    path('accounts/login/', include('club.urls')),  # fallback or direct login
+    path('', include('user.urls')),
 ]
 
 if settings.DEBUG:

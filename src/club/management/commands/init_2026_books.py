@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from club.models import Book, Meeting, User
+from club.models import Book, Meeting
+from user.models import User
 from datetime import timedelta
 
 
@@ -9,30 +10,28 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # 1. Создание суперпользователя / админа
-        admin_login = 'admin'
-        if not User.objects.filter(login=admin_login).exists():
+        admin_email = 'admin@miran.local'
+        if not User.objects.filter(email=admin_email).exists():
             User.objects.create_superuser(
-                login=admin_login,
-                email='admin@miran.local',
+                email=admin_email,
                 password='adminpassword2026',
                 role=User.Role.ADMIN,
                 first_name='Администратор',
             )
-            self.stdout.write(self.style.SUCCESS(f'Создан админ: {admin_login} / adminpassword2026'))
+            self.stdout.write(self.style.SUCCESS(f'Создан админ: {admin_email} / adminpassword2026'))
         else:
-            self.stdout.write(f'Админ {admin_login} уже существует.')
+            self.stdout.write(f'Админ {admin_email} уже существует.')
 
         # 2. Создание тестового участника
-        participant_login = 'participant1'
-        if not User.objects.filter(login=participant_login).exists():
+        participant_email = 'user1@miran.local'
+        if not User.objects.filter(email=participant_email).exists():
             User.objects.create_user(
-                login=participant_login,
-                email='user1@miran.local',
+                email=participant_email,
                 password='password2026',
                 role=User.Role.PARTICIPANT,
                 first_name='Участник Клуба',
             )
-            self.stdout.write(self.style.SUCCESS(f'Создан участник: {participant_login} / password2026'))
+            self.stdout.write(self.style.SUCCESS(f'Создан участник: {participant_email} / password2026'))
 
         # 3. Создание 12 книг 2026 года
         books_data = [

@@ -1,57 +1,6 @@
-from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.conf import settings
 from django.db import models
 from django.db.models import Avg
-
-
-class UserManager(BaseUserManager):
-    def create_user(self, login, email=None, password=None, **extra_fields):
-        if not login:
-            raise ValueError('The Login must be set')
-        email = self.normalize_email(email)
-        user = self.model(login=login, email=email, **extra_fields)
-        user.set_password(password)
-        user.save(using=self._db)
-        return user
-
-    def create_superuser(self, login, email=None, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('role', 'admin')
-
-        if extra_fields.get('is_staff') is not True:
-            raise ValueError('Superuser must have is_staff=True.')
-        if extra_fields.get('is_superuser') is not True:
-            raise ValueError('Superuser must have is_superuser=True.')
-
-        return self.create_user(login, email, password, **extra_fields)
-
-
-class User(AbstractUser):
-    class Role(models.TextChoices):
-        ADMIN = 'admin', 'Админ'
-        PARTICIPANT = 'participant', 'Участник'
-
-    # TZ specifies login as unique username
-    username = None
-    login = models.CharField('Логин', max_length=150, unique=True)
-    role = models.CharField(
-        'Роль',
-        max_length=20,
-        choices=Role.choices,
-        default=Role.PARTICIPANT,
-    )
-
-    objects = UserManager()
-
-    USERNAME_FIELD = 'login'
-    REQUIRED_FIELDS = ['email']
-
-    def __str__(self):
-        return self.login
-
-    @property
-    def is_admin(self):
-        return self.role == self.Role.ADMIN
 
 
 class Book(models.Model):
@@ -119,7 +68,7 @@ class Vote(models.Model):
         Book, on_delete=models.CASCADE, related_name='votes', verbose_name='Книга'
     )
     user = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='votes',
         verbose_name='Участник',
@@ -135,7 +84,7 @@ class Vote(models.Model):
         verbose_name_plural = 'Голоса'
 
     def __str__(self):
-        return f'{self.user.login} -> {self.book.title}: {self.rating}'
+        return f'{self.user.email} -> {self.book.title}: {self.rating}'
 
 
 class Review(models.Model):
@@ -143,7 +92,7 @@ class Review(models.Model):
         Book, on_delete=models.CASCADE, related_name='reviews', verbose_name='Книга'
     )
     user = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='reviews',
         verbose_name='Автор',
@@ -158,7 +107,7 @@ class Review(models.Model):
         verbose_name_plural = 'Отзывы'
 
     def __str__(self):
-        return f'Отзыв от {self.user.login} на {self.book.title}'
+        return f'Отзыв от {self.user.email} на {self.book.title}'
 
 
 class Meeting(models.Model):

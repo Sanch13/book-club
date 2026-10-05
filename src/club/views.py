@@ -1,17 +1,10 @@
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.views import LoginView
-from django.http import HttpResponseForbidden, HttpResponseRedirect
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
 from django.utils import timezone
-from .forms import LoginForm, ReviewForm
+
+from .forms import ReviewForm
 from .models import Book, Meeting, Review, Vote
-
-
-class CustomLoginView(LoginView):
-    form_class = LoginForm
-    template_name = 'club/login.html'
-    redirect_authenticated_user = True
 
 
 @login_required

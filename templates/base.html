@@ -42,7 +42,7 @@
                 {% endif %}
             </nav>
             <div class="flex items-center space-x-4">
-                <span class="text-sm bg-gray-600 px-3 py-1 rounded-full">👤 {{ user.login }}</span>
+                <span class="text-sm bg-gray-600 px-3 py-1 rounded-full">👤 {{ user.email }}</span>
                 <form action="{% url 'logout' %}" method="post" class="inline">
                     {% csrf_token %}
                     <button type="submit" class="text-sm bg-[#A2D813] text-gray-900 font-semibold px-3 py-1 rounded hover:bg-lime-500 transition">Выйти</button>
@@ -51,6 +51,17 @@
             {% endif %}
         </div>
     </header>
+
+    <!-- Messages -->
+    {% if messages %}
+    <div class="max-w-7xl w-full mx-auto px-4 pt-4 space-y-2">
+        {% for message in messages %}
+        <div class="bg-green-100 border-l-4 border-[#A2D813] p-3 text-sm text-green-800 rounded">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <!-- Main Content -->
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-8">
