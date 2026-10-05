@@ -1,0 +1,26 @@
+[project]
+name = "miran-book-club"
+version = "0.1.0"
+description = "Corporate book club site for Miran 2026"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "django>=6.0",
+    "pillow",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-django",
+    "ruff",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["src"]
+python_files = ["test_*.py", "*_test.py"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"

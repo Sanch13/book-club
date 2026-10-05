@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}Редактировать отзыв | Книжный клуб Miran{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto bg-white rounded-2xl shadow-md p-8 border border-gray-100 space-y-6">
+    <div>
+        <a href="{% url 'book_detail' book.pk %}" class="text-sm font-semibold text-[#707372] hover:text-[#A2D813]">← Назад к книге "{{ book.title }}"</a>
+        <h1 class="text-2xl font-extrabold text-gray-900 mt-2">Редактирование отзыва</h1>
+    </div>
+
+    <form method="post" class="space-y-4">
+        {% csrf_token %}
+        <div>
+            <label class="block text-gray-700 text-sm font-bold mb-2">Текст отзыва</label>
+            {{ form.text }}
+        </div>
+        <div class="flex space-x-4">
+            <button type="submit" class="bg-[#A2D813] text-gray-900 font-bold px-6 py-2 rounded-xl text-sm hover:bg-lime-500 transition shadow">
+                Сохранить изменения
+            </button>
+            <a href="{% url 'book_detail' book.pk %}" class="bg-gray-200 text-gray-700 font-bold px-6 py-2 rounded-xl text-sm hover:bg-gray-300 transition text-center flex items-center">
+                Отмена
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
