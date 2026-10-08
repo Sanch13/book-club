@@ -20,8 +20,10 @@ venv.bak/
 logs/
 fixtures/
 media/
-static/
 shell_scripts/
+
+# Сборка статики (collectstatic). Исходники в static/ — под git.
+staticfiles/
 
 # pyenv
 .python-version

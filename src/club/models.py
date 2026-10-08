@@ -2,18 +2,32 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Avg
 
+from .dateutils import format_datetime
+
+MONTH_CHOICES = [
+    (1, 'Январь'),
+    (2, 'Февраль'),
+    (3, 'Март'),
+    (4, 'Апрель'),
+    (5, 'Май'),
+    (6, 'Июнь'),
+    (7, 'Июль'),
+    (8, 'Август'),
+    (9, 'Сентябрь'),
+    (10, 'Октябрь'),
+    (11, 'Ноябрь'),
+    (12, 'Декабрь'),
+]
+
 
 class Book(models.Model):
     year = models.PositiveIntegerField('Год', default=2026)
-    month = models.PositiveIntegerField('Месяц (1-12)', default=1)
+    month = models.PositiveIntegerField('Месяц', choices=MONTH_CHOICES, default=1)
     title = models.CharField('Название книги', max_length=255)
     author = models.CharField('Автор', max_length=255)
     short_description = models.TextField('Краткое описание')
     cover_image = models.ImageField(
         'Обложка', upload_to='books/covers/', blank=True, null=True
-    )
-    book_page = models.CharField(
-        'Страница книги (URL или текст)', max_length=500, blank=True
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -24,7 +38,12 @@ class Book(models.Model):
         verbose_name_plural = 'Книги'
 
     def __str__(self):
-        return f'{self.month}. {self.title} — {self.author}'
+        return f'{self.month_name}: {self.title} — {self.author}'
+
+    @property
+    def month_name(self):
+        """Название месяца по-русски (напр. 1 -> 'Январь')."""
+        return self.get_month_display()
 
     @property
     def average_rating(self):
@@ -34,8 +53,11 @@ class Book(models.Model):
 
 class BookAttachment(models.Model):
     class AttachmentType(models.TextChoices):
+        # Только форматы, которые браузер открывает сам. PPT/PDF-документы
+        # Office браузер не отображает — только скачивает, поэтому их нет.
         PDF = 'pdf', 'PDF'
-        PPT = 'ppt', 'PPT'
+        MP3 = 'mp3', 'MP3'
+        MP4 = 'mp4', 'MP4'
 
     book = models.ForeignKey(
         Book,
@@ -49,18 +71,40 @@ class BookAttachment(models.Model):
         choices=AttachmentType.choices,
         default=AttachmentType.PDF,
     )
-    file = models.FileField('Файл', upload_to='books/attachments/')
-    title = models.CharField(
-        'Заголовок материала', max_length=255, blank=True, default='Материалы'
-    )
+    # blank=True: строка может существовать без файла — тогда на странице
+    # книги вместо ссылки показывается серая заглушка.
+    file = models.FileField('Файл', upload_to='books/attachments/', blank=True)
+    title = models.CharField('Название', max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = 'Материал книги'
-        verbose_name_plural = 'Материалы книг'
+        ordering = ['file_type', 'created_at']
+        verbose_name = 'Файл книги'
+        verbose_name_plural = 'Файлы книг'
 
     def __str__(self):
-        return f'{self.get_file_type_display()} - {self.title} ({self.book.title})'
+        return f'{self.get_file_type_display()} - {self.display_name} ({self.book.title})'
+
+    @property
+    def file_name(self):
+        """Имя загруженного файла без пути и расширения-дубля."""
+        if not self.file:
+            return ''
+        return self.file.name.rsplit('/', 1)[-1]
+
+    @property
+    def display_name(self):
+        """Что показывать пользователю: заданное название или имя файла."""
+        return self.title or self.file_name
+
+    @property
+    def has_file(self):
+        """Есть ли реально доступный файл (а не только запись в БД)."""
+        return bool(self.file) and self.file.storage.exists(self.file.name)
+
+    @property
+    def file_url(self):
+        return self.file.url if self.has_file else ''
 
 
 class Vote(models.Model):
@@ -110,6 +154,28 @@ class Review(models.Model):
         return f'Отзыв от {self.user.email} на {self.book.title}'
 
 
+class ReviewComment(models.Model):
+    review = models.ForeignKey(
+        Review, on_delete=models.CASCADE, related_name='comments', verbose_name='Отзыв'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='review_comments',
+        verbose_name='Автор',
+    )
+    text = models.TextField('Текст комментария')
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Комментарий'
+        verbose_name_plural = 'Комментарии'
+
+    def __str__(self):
+        return f'Комментарий от {self.user.email} к отзыву #{self.review_id}'
+
+
 class Meeting(models.Model):
     title = models.CharField(
         'Название встречи', max_length=255, default='Встреча книжного клуба'
@@ -126,4 +192,4 @@ class Meeting(models.Model):
         verbose_name_plural = 'Встречи'
 
     def __str__(self):
-        return f'{self.title} ({self.date_time.strftime("%d.%m.%Y %H:%M")})'
+        return f'{self.title} ({format_datetime(self.date_time)})'

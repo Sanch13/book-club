@@ -1,0 +1,23 @@
+{% extends "admin/change_list.html" %}
+
+{% comment %}
+Плашки выбора года (2025, 2026) под строкой поиска.
+
+Переопределяем блок search: {{ block.super }} выводит штатную форму
+поиска, а следом идут плашки. Так не приходится копировать целиком
+change_list.html — шаблон переживёт обновление Django.
+{% endcomment %}
+
+{% block search %}
+  {{ block.super }}
+  {% if year_tabs %}
+  <div class="miran-year-tabs">
+    <span class="miran-year-tabs__caption">Год программы</span>
+    {% for tab in year_tabs %}
+      <a href="{{ tab.url }}"
+         class="miran-year-tab{% if tab.selected %} is-active{% endif %}"
+         {% if tab.selected %}aria-current="page"{% endif %}>{{ tab.label }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endblock %}

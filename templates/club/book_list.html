@@ -1,13 +1,15 @@
 {% extends 'base.html' %}
 {% load club_tags %}
 
-{% block title %}Книги 2026 | Книжный клуб Miran{% endblock %}
+{% block title %}{% if year %}Книги {{ year }}{% else %}Все книги{% endif %} | Книжный клуб Miran{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-900">Книги 2026 года</h1>
+            <h1 class="text-3xl font-extrabold text-gray-900">
+                {% if year %}Книги {{ year }} года{% else %}Книги по годам{% endif %}
+            </h1>
             <p class="text-gray-600 text-sm mt-1">12 книг на каждый месяц года. Читайте, оценивайте и оставляйте отзывы.</p>
         </div>
         <div class="mt-4 md:mt-0">
@@ -15,12 +17,38 @@
         </div>
     </div>
 
+    <!-- Переключатель года -->
+    {% if available_years|length > 1 %}
+    <div class="flex flex-wrap gap-2">
+        <a href="{% url 'book_list' %}"
+           class="px-4 py-1.5 rounded-full text-sm font-semibold transition
+                  {% if not year %}bg-[#A2D813] text-gray-900{% else %}bg-white text-gray-700 hover:bg-gray-100{% endif %}">
+            Все годы
+        </a>
+        {% for y in available_years %}
+        <a href="{% url 'book_list_year' y %}"
+           class="px-4 py-1.5 rounded-full text-sm font-semibold transition
+                  {% if y == year %}bg-[#A2D813] text-gray-900{% else %}bg-white text-gray-700 hover:bg-gray-100{% endif %}">
+            {{ y }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Books Grid -->
+    {% for group_year, group_books in books_by_year %}
+    {% if not year %}
+    <div class="pt-2">
+        <h2 class="text-2xl font-bold text-gray-900">{{ group_year }} год</h2>
+        <p class="text-sm text-gray-500">{{ group_books|length }} книг</p>
+    </div>
+    {% endif %}
+
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {% for book in books %}
+        {% for book in group_books %}
         <div class="bg-white rounded-2xl shadow hover:shadow-lg transition overflow-hidden border border-gray-100 flex flex-col">
             <div class="bg-[#707372] text-white px-4 py-2 flex justify-between items-center text-xs font-bold uppercase tracking-wider">
-                <span>Месяц {{ book.month }}</span>
+                <span>{{ book.month_name }}</span>
                 {% with user_rating=user_votes|dict_key:book.pk %}
                 {% if user_rating %}
                 <span class="bg-[#A2D813] text-gray-900 px-2 py-0.5 rounded font-black">Ваш балл: {{ user_rating }}</span>
@@ -29,7 +57,19 @@
                 {% endif %}
                 {% endwith %}
             </div>
-            
+
+            <!-- Обложка: показывается целиком, книжные пропорции не искажаются -->
+            {% if book.cover_image %}
+            <a href="{% url 'book_detail' book.pk %}" class="block bg-gray-100 border-b border-gray-100">
+                <img src="{{ book.cover_image.url }}" alt="{{ book.title }}" loading="lazy"
+                     class="w-full h-40 object-contain">
+            </a>
+            {% else %}
+            <div class="h-40 bg-gray-100 border-b border-gray-100 flex items-center justify-center text-gray-400 text-xs font-bold uppercase tracking-wider">
+                <span>📕 {{ book.month_name }}</span>
+            </div>
+            {% endif %}
+
             <div class="p-6 flex-grow flex flex-col justify-between">
                 <div>
                     <h3 class="text-xl font-bold text-gray-900 line-clamp-1">{{ book.title }}</h3>
@@ -52,5 +92,12 @@
         </div>
         {% endfor %}
     </div>
+    {% empty %}
+    <div class="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+        <p class="text-gray-500">
+            {% if year %}Книг за {{ year }} год пока нет.{% else %}Пока не добавлено ни одной книги.{% endif %}
+        </p>
+    </div>
+    {% endfor %}
 </div>
 {% endblock %}

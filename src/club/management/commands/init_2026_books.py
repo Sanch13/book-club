@@ -1,8 +1,10 @@
+from datetime import timedelta
+
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+
 from club.models import Book, Meeting
 from user.models import User, WhitelistEmail
-from datetime import timedelta
 
 
 class Command(BaseCommand):
@@ -68,13 +70,12 @@ class Command(BaseCommand):
                     'title': title,
                     'author': author,
                     'short_description': desc,
-                    'book_page': f'https://example.com/books/{month}-2026',
                 }
             )
             if created:
-                self.stdout.write(f'Создана книга (Месяц {month}): {title}')
+                self.stdout.write(f'Создана книга ({book.month_name}): {title}')
             else:
-                self.stdout.write(f'Книга за месяц {month} уже существует.')
+                self.stdout.write(f'Книга за месяц {book.month_name} уже существует.')
 
         # 4. Создание встречи
         if not Meeting.objects.exists():

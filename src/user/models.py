@@ -52,6 +52,18 @@ class User(AbstractUser):
     def __str__(self):
         return self.email
 
+    @property
+    def display_name(self):
+        """Как показывать пользователя: «Фамилия Имя» или email.
+
+        Имя показывается только если заполнены оба поля — иначе в списках
+        отзывов вместо почты появлялись бы служебные значения вроде
+        «Участник Клуба».
+        """
+        if self.first_name and self.last_name:
+            return f'{self.last_name} {self.first_name}'
+        return self.email
+
     def save(self, *args, **kwargs):
         self.email = normalize_email(self.email)
         super().save(*args, **kwargs)

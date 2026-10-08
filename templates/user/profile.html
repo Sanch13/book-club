@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}Личный кабинет | Книжный клуб Miran{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <div>
+        <h1 class="text-3xl font-extrabold text-gray-900">Личный кабинет</h1>
+        <p class="text-gray-600 text-sm mt-1">
+            Email для входа: <span class="font-semibold text-gray-800">{{ user.email }}</span>.
+            Изменить его нельзя — он же является логином.
+        </p>
+    </div>
+
+    <!-- Как вас видят другие участники -->
+    <div class="bg-gray-50 border border-gray-100 rounded-xl p-5">
+        <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">
+            Как вас видят в отзывах и комментариях
+        </h2>
+        {% if user.first_name and user.last_name %}
+        <p class="text-gray-800 font-semibold">{{ user.display_name }}</p>
+        {% else %}
+        <p class="text-gray-800 font-semibold">{{ user.email }}</p>
+        <p class="text-xs text-gray-500 mt-1">
+            Пока не заполнены имя и фамилия, подписываетесь email.
+            Заполните форму ниже — и будет видно «Фамилия Имя».
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- ФИО -->
+    <div class="bg-white rounded-2xl shadow-md p-8 border border-gray-100">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">Имя и фамилия</h2>
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">{{ profile_form.first_name.label }}</label>
+                    {{ profile_form.first_name }}
+                    {% for error in profile_form.first_name.errors %}
+                    <p class="text-red-600 text-xs mt-1">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">{{ profile_form.last_name.label }}</label>
+                    {{ profile_form.last_name }}
+                    {% for error in profile_form.last_name.errors %}
+                    <p class="text-red-600 text-xs mt-1">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+            <button type="submit" name="save_profile" value="1"
+                    class="bg-[#A2D813] text-gray-900 font-bold px-6 py-2 rounded-xl text-sm hover:bg-lime-500 transition shadow">
+                Сохранить
+            </button>
+        </form>
+    </div>
+
+    <!-- Пароль -->
+    <div class="bg-white rounded-2xl shadow-md p-8 border border-gray-100">
+        <h2 class="text-xl font-bold text-gray-900 mb-1">Смена пароля</h2>
+        <p class="text-gray-500 text-xs mb-4">После смены пароля останетесь в системе.</p>
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            {% if password_form.non_field_errors %}
+            <div class="bg-red-50 border-l-4 border-red-400 p-3 text-sm text-red-700 rounded">
+                {% for error in password_form.non_field_errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+            {% for field in password_form %}
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            <button type="submit" name="change_password" value="1"
+                    class="bg-[#707372] text-white font-bold px-6 py-2 rounded-xl text-sm hover:bg-gray-800 transition shadow">
+                Сменить пароль
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
