@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from club.models import Book, Meeting
-from user.models import User
+from user.models import User, WhitelistEmail
 from datetime import timedelta
 
 
@@ -9,6 +9,17 @@ class Command(BaseCommand):
     help = 'Инициализирует 12 книг 2026 года, админа, участников и тестовую встречу'
 
     def handle(self, *args, **options):
+        # 0. Наполнение белого списка (без него регистрация и вход закрыты)
+        for email, comment in (
+            ('admin@miran.local', 'Администратор'),
+            ('user1@miran.local', 'Участник клуба'),
+        ):
+            _, created = WhitelistEmail.objects.get_or_create(
+                email=email, defaults={'comment': comment}
+            )
+            if created:
+                self.stdout.write(self.style.SUCCESS(f'Email добавлен в белый список: {email}'))
+
         # 1. Создание суперпользователя / админа
         admin_email = 'admin@miran.local'
         if not User.objects.filter(email=admin_email).exists():

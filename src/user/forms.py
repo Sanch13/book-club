@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth import password_validation
 from django.contrib.auth.forms import AuthenticationForm
 
-from .models import User
+from .models import User, WhitelistEmail, normalize_email
 
 EMAIL_INPUT_ATTRS = {
     'class': 'w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A2D813]',
@@ -20,6 +20,9 @@ NEW_PASSWORD_INPUT_ATTRS = {
 }
 
 
+NOT_IN_WHITELIST_ERROR = 'Этот email отсутствует в белом списке. Обратитесь к администратору.'
+
+
 class LoginForm(AuthenticationForm):
     username = forms.EmailField(
         label='Email',
@@ -30,6 +33,12 @@ class LoginForm(AuthenticationForm):
         widget=forms.PasswordInput(attrs=PASSWORD_INPUT_ATTRS),
     )
 
+    def clean_username(self):
+        email = normalize_email(self.cleaned_data.get('username'))
+        if not WhitelistEmail.is_allowed(email):
+            raise forms.ValidationError(NOT_IN_WHITELIST_ERROR)
+        return email
+
 
 class RegistrationForm(forms.Form):
     email = forms.EmailField(label='Email', widget=forms.EmailInput(attrs=EMAIL_INPUT_ATTRS))
@@ -39,11 +48,12 @@ class RegistrationForm(forms.Form):
     )
 
     def clean_email(self):
-        email = self.cleaned_data.get('email')
-        normalized = User._default_manager.normalize_email(email)
-        if User.objects.filter(email__iexact=normalized).exists():
+        email = normalize_email(self.cleaned_data.get('email'))
+        if not WhitelistEmail.is_allowed(email):
+            raise forms.ValidationError(NOT_IN_WHITELIST_ERROR)
+        if User.objects.filter(email__iexact=email).exists():
             raise forms.ValidationError('Пользователь с таким email уже зарегистрирован.')
-        return normalized
+        return email
 
     def clean_password(self):
         password = self.cleaned_data.get('password')
