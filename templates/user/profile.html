@@ -5,15 +5,15 @@
 {% block content %}
 <div class="max-w-2xl mx-auto space-y-6">
     <div>
-        <h1 class="text-3xl font-extrabold text-gray-900">Личный кабинет</h1>
-        <p class="text-gray-600 text-sm mt-1">
-            Email для входа: <span class="font-semibold text-gray-800">{{ user.email }}</span>.
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Личный кабинет</h1>
+        <p class="text-gray-600 text-sm mt-1 break-words">
+            Email для входа: <span class="font-semibold text-gray-800 break-all">{{ user.email }}</span>.
             Изменить его нельзя — он же является логином.
         </p>
     </div>
 
     <!-- Как вас видят другие участники -->
-    <div class="bg-gray-50 border border-gray-100 rounded-xl p-5">
+    <div class="bg-gray-50 border border-gray-100 rounded-xl p-4 sm:p-5">
         <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">
             Как вас видят в отзывах и комментариях
         </h2>
@@ -29,7 +29,7 @@
     </div>
 
     <!-- ФИО -->
-    <div class="bg-white rounded-2xl shadow-md p-8 border border-gray-100">
+    <div class="bg-white rounded-2xl shadow-md p-4 sm:p-8 border border-gray-100">
         <h2 class="text-xl font-bold text-gray-900 mb-4">Имя и фамилия</h2>
         <form method="post" class="space-y-4">
             {% csrf_token %}
@@ -50,14 +50,14 @@
                 </div>
             </div>
             <button type="submit" name="save_profile" value="1"
-                    class="bg-[#A2D813] text-gray-900 font-bold px-6 py-2 rounded-xl text-sm hover:bg-lime-500 transition shadow">
+                    class="bg-[#A2D813] text-gray-900 font-bold px-6 py-3 rounded-xl text-sm hover:bg-lime-500 transition shadow">
                 Сохранить
             </button>
         </form>
     </div>
 
     <!-- Пароль -->
-    <div class="bg-white rounded-2xl shadow-md p-8 border border-gray-100">
+    <div class="bg-white rounded-2xl shadow-md p-4 sm:p-8 border border-gray-100">
         <h2 class="text-xl font-bold text-gray-900 mb-1">Смена пароля</h2>
         <p class="text-gray-500 text-xs mb-4">После смены пароля останетесь в системе.</p>
         <form method="post" class="space-y-4">
@@ -77,7 +77,7 @@
             </div>
             {% endfor %}
             <button type="submit" name="change_password" value="1"
-                    class="bg-[#707372] text-white font-bold px-6 py-2 rounded-xl text-sm hover:bg-gray-800 transition shadow">
+                    class="bg-[#707372] text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-gray-800 transition shadow">
                 Сменить пароль
             </button>
         </form>

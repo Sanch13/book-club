@@ -22,6 +22,28 @@ def rating_scale():
     return Vote._meta.get_field('rating').choices
 
 
+@register.filter(name='ru_plural')
+def ru_plural(value, forms):
+    """Русское склонение числительных: 1 книга, 2 книги, 5 книг.
+
+    Django-фильтр pluralize знает только две формы (1 и всё остальное),
+    русскому нужны три. Формы передаются строкой: ``"книга,книги,книг"``.
+
+    Правило: 1, 21, 31… → книга; 2-4, 22-24… → книги; остальное → книг.
+    Числа вроде 11-14 «сбиваются» в множественное — поэтому проверяем и десятки.
+    """
+    one, few, many = forms.split(',')
+    try:
+        n = abs(int(value))
+    except (TypeError, ValueError):
+        return many
+    if n % 10 == 1 and n % 100 != 11:
+        return one
+    if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        return few
+    return many
+
+
 @register.filter(name='ru_date')
 def ru_date(value):
     """Дата по-русски: 8 октября 2026."""

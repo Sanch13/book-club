@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 
 from .images import ALLOWED_EXTENSIONS
-from .models import Book, BookAttachment, Meeting, Review, ReviewComment, Vote
+from .models import Book, BookAttachment, Favorite, Meeting, Review, ReviewComment, Vote
 
 
 class BookAdminForm(forms.ModelForm):
@@ -149,6 +149,24 @@ class VoteAdmin(admin.ModelAdmin):
     list_display = ('book', 'user', 'rating', 'updated_at')
     list_filter = ('book__year', 'rating')
     search_fields = ('user__email', 'book__title')
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    """Кто какую книгу считает самой любимой.
+
+    Участника править нельзя: у него всегда ровно одна запись,
+    и ручная правка book здесь — единственный способ её испортить.
+    """
+
+    list_display = ('user', 'book', 'created_at')
+    list_filter = ('book__year',)
+    search_fields = ('user__email', 'user__first_name', 'user__last_name', 'book__title')
+    autocomplete_fields = ('book',)
+
+    def has_add_permission(self, request):
+        # Нового выбора делают сами участники с сайта
+        return False
 
 
 @admin.register(Review)

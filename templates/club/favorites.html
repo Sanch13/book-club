@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+
+{% load club_tags %}
+
+{% block title %}Рейтинг любимых книг | Книжный клуб Miran{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-4xl mx-auto">
+
+    <div>
+        <a href="{% url 'index' %}" class="inline-flex items-center text-sm font-semibold text-[#707372] hover:text-[#A2D813] min-h-10">← На главную</a>
+    </div>
+
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">❤️ Самая любимая книга</h1>
+        <p class="text-gray-600 text-sm mt-1">
+            У каждого участника одна любимая книга за всё время. Перенести сердечко
+            можно в любой момент — со старой книги оно снимется автоматически.
+        </p>
+    </div>
+
+    <!-- Сколько всего книг отмечено -->
+    <div class="grid grid-cols-2 gap-4">
+        <div class="bg-white rounded-2xl shadow p-4 sm:p-6 border border-gray-100 text-center">
+            <span class="block text-3xl sm:text-4xl font-black text-gray-900">{{ books|length }}</span>
+            <span class="text-xs sm:text-sm uppercase tracking-wider text-gray-500">книг в рейтинге</span>
+        </div>
+        <div class="bg-white rounded-2xl shadow p-4 sm:p-6 border border-gray-100 text-center">
+            <span class="block text-3xl sm:text-4xl font-black text-red-600">{{ favorites_count }}</span>
+            <span class="text-xs sm:text-sm uppercase tracking-wider text-gray-500">участников отметились</span>
+        </div>
+    </div>
+
+    {% if books %}
+    <!-- Рейтинг: длина полосы пропорциональна числу сердечек -->
+    <div class="bg-white rounded-2xl shadow-md p-4 sm:p-8 border border-gray-100">
+        <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-4">Рейтинг по сердечкам</h2>
+
+        {% with top=books.0.hearts %}
+        <ol class="space-y-4">
+            {% for book in books %}
+            <li>
+                <a href="{% url 'book_detail' book.pk %}"
+                   class="flex items-center gap-3 sm:gap-4 p-3 rounded-xl hover:bg-gray-50 transition border border-gray-100">
+                    <span class="w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm
+                                 {% if forloop.counter == 1 %}bg-red-600 text-white
+                                 {% else %}bg-gray-100 text-[#707372]{% endif %}">
+                        {{ forloop.counter }}
+                    </span>
+
+                    <div class="min-w-0 flex-1">
+                        <h3 class="font-semibold text-gray-900 line-clamp-2">{{ book.title }}</h3>
+                        <p class="text-xs text-gray-500 truncate">{{ book.author }} ({{ book.month_name }} {{ book.year }})</p>
+
+                        <!-- Полоса: ширина в % от максимума, чтобы 13 и 1 читались сразу -->
+                        <div class="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-red-500 rounded-full"
+                                 style="width: {% widthratio book.hearts top 100 %}%"></div>
+                        </div>
+                    </div>
+
+                    <span class="shrink-0 inline-flex items-center gap-1 text-red-600 font-black text-sm whitespace-nowrap">
+                        <svg viewBox="0 0 24 24" class="w-4 h-4" fill="currentColor" aria-hidden="true">
+                            <path d="M12 20.7l-1.5-1.35C5.1 14.5 2 11.7 2 8.2 2 5.4 4.2 3.2 7 3.2c1.6 0 3.1.74 4 1.94.9-1.2 2.4-1.94 4-1.94 2.8 0 5 2.2 5 5 0 3.5-3.1 6.3-8.5 11.15z"/>
+                        </svg>
+                        {{ book.hearts }}
+                    </span>
+                </a>
+            </li>
+            {% endfor %}
+        </ol>
+        {% endwith %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+        <p class="text-gray-400 text-4xl mb-3">🤍</p>
+        <p class="text-gray-500">Пока никто не отметил любимую книгу.</p>
+        <p class="text-gray-400 text-sm mt-1">Откройте любую книгу и нажмите на сердечко.</p>
+    </div>
+    {% endif %}
+
+    <!-- Кто какую книгу отметил -->
+    {% if favorites %}
+    <div class="bg-white rounded-2xl shadow-md p-4 sm:p-8 border border-gray-100">
+        <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-4">Кто что отметил</h2>
+        <div class="flex flex-wrap gap-2">
+            {% for fav in favorites %}
+            <a href="{% url 'book_detail' fav.book.pk %}"
+               class="inline-flex items-center min-h-10 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-100 text-sm hover:bg-gray-100 transition max-w-full min-w-0">
+                <span class="font-semibold text-gray-800 shrink-0">{{ fav.user.display_name }}</span>
+                <span class="text-gray-400 mx-1 shrink-0">→</span>
+                <span class="truncate text-gray-600">{{ fav.book.title }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Мой выбор: куда перенести сердечко -->
+    <div class="bg-white rounded-2xl shadow-md p-4 sm:p-8 border border-gray-100">
+        <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-1">Мой выбор</h2>
+        {% if my_favorite %}
+        <p class="text-gray-600 text-sm mb-4">
+            Сейчас ваша любимая книга — <span class="font-semibold text-gray-900">{{ my_favorite.book.title }}</span>.
+            Нажмите сердечко на другой книге, чтобы перенести выбор.
+        </p>
+        <a href="{% url 'book_detail' my_favorite.book.pk %}"
+           class="inline-flex items-center gap-3 min-h-11 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 transition max-w-full min-w-0">
+            {% if my_favorite.book.cover_image %}
+            <img src="{{ my_favorite.book.cover_image.url }}" alt="" loading="lazy"
+                 class="w-10 h-14 object-contain bg-gray-100 rounded shrink-0">
+            {% endif %}
+            <span class="min-w-0">
+                <span class="block text-xs text-gray-500">{{ my_favorite.book.month_name }} {{ my_favorite.book.year }}</span>
+                <span class="block font-semibold text-gray-900 truncate">{{ my_favorite.book.title }}</span>
+            </span>
+        </a>
+        {% else %}
+        <p class="text-gray-500 text-sm">
+            Вы ещё не выбрали любимую книгу. Откройте
+            <a href="{% url 'book_list' %}" class="text-[#707372] font-semibold hover:text-[#A2D813] underline">список книг</a>
+            и нажмите на сердечко.
+        </p>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

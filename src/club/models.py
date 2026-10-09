@@ -131,6 +131,37 @@ class Vote(models.Model):
         return f'{self.user.email} -> {self.book.title}: {self.rating}'
 
 
+class Favorite(models.Model):
+    """Самая любимая книга участника — ровно одна за всё время.
+
+    OneToOne, а не обычный ForeignKey: «одна на пользователя» тогда
+    обеспечивает сама БД, и нельзя случайно сохранить два сердечка
+    подряд при гонке двух запросов. Снять выбор с одной книги и поставить
+    на другую — это один UPDATE той же строки, а не удаление плюс вставка.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='favorite',
+        verbose_name='Участник',
+    )
+    book = models.ForeignKey(
+        Book,
+        on_delete=models.CASCADE,
+        related_name='favorited_by',
+        verbose_name='Книга',
+    )
+    created_at = models.DateTimeField('Отмечено', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Любимая книга'
+        verbose_name_plural = 'Любимые книги'
+
+    def __str__(self):
+        return f'{self.user.display_name} → {self.book.title}'
+
+
 class Review(models.Model):
     book = models.ForeignKey(
         Book, on_delete=models.CASCADE, related_name='reviews', verbose_name='Книга'

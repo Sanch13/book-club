@@ -1,0 +1,25 @@
+{% comment %}
+Кнопка-сердечко. Ожидает в контексте:
+  book        — книга
+  is_favorite — сердечко этой книги уже стоит у текущего пользователя
+  hearts      — сколько всего сердечек у книги (необязательно, показывается рядом)
+  next        — куда вернуться после нажатия (обычно текущая страница)
+
+Форма, а не ссылка: выбор меняет данные, поэтому нужен POST с CSRF-токеном.
+{% endcomment %}
+<form method="post" action="{% url 'toggle_favorite' book.pk %}" class="contents">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next|default:request.get_full_path }}">
+    <button type="submit"
+            aria-pressed="{% if is_favorite %}true{% else %}false{% endif %}"
+            aria-label="{% if is_favorite %}Убрать сердечко — это ваша любимая книга{% else %}Отметить как самую любимую книгу{% endif %}"
+            title="{% if is_favorite %}Снять сердечко{% else %}Моя самая любимая книга{% endif %}"
+            class="group inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/90 hover:bg-white active:scale-90 transition shadow-md
+                   {% if is_favorite %}text-red-600{% else %}text-gray-400 hover:text-red-500{% endif %}">
+        <svg viewBox="0 0 24 24" class="w-6 h-6 pointer-events-none"
+             {% if is_favorite %}fill="currentColor"{% else %}fill="none"{% endif %}
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 20.7l-1.5-1.35C5.1 14.5 2 11.7 2 8.2 2 5.4 4.2 3.2 7 3.2c1.6 0 3.1.74 4 1.94.9-1.2 2.4-1.94 4-1.94 2.8 0 5 2.2 5 5 0 3.5-3.1 6.3-8.5 11.15z"/>
+        </svg>
+    </button>
+</form>

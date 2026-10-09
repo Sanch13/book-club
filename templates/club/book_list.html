@@ -7,13 +7,13 @@
 <div class="space-y-6">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-900">
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">
                 {% if year %}Книги {{ year }} года{% else %}Книги по годам{% endif %}
             </h1>
             <p class="text-gray-600 text-sm mt-1">12 книг на каждый месяц года. Читайте, оценивайте и оставляйте отзывы.</p>
         </div>
         <div class="mt-4 md:mt-0">
-            <a href="{% url 'index' %}" class="text-sm font-semibold text-[#707372] hover:text-[#A2D813]">← На главную</a>
+            <a href="{% url 'index' %}" class="inline-flex items-center text-sm font-semibold text-[#707372] hover:text-[#A2D813] min-h-10">← На главную</a>
         </div>
     </div>
 
@@ -21,13 +21,13 @@
     {% if available_years|length > 1 %}
     <div class="flex flex-wrap gap-2">
         <a href="{% url 'book_list' %}"
-           class="px-4 py-1.5 rounded-full text-sm font-semibold transition
+           class="inline-flex items-center px-4 min-h-10 rounded-full text-sm font-semibold transition
                   {% if not year %}bg-[#A2D813] text-gray-900{% else %}bg-white text-gray-700 hover:bg-gray-100{% endif %}">
             Все годы
         </a>
         {% for y in available_years %}
         <a href="{% url 'book_list_year' y %}"
-           class="px-4 py-1.5 rounded-full text-sm font-semibold transition
+           class="inline-flex items-center px-4 min-h-10 rounded-full text-sm font-semibold transition
                   {% if y == year %}bg-[#A2D813] text-gray-900{% else %}bg-white text-gray-700 hover:bg-gray-100{% endif %}">
             {{ y }}
         </a>
@@ -58,17 +58,24 @@
                 {% endwith %}
             </div>
 
-            <!-- Обложка: показывается целиком, книжные пропорции не искажаются -->
-            {% if book.cover_image %}
-            <a href="{% url 'book_detail' book.pk %}" class="block bg-gray-100 border-b border-gray-100">
-                <img src="{{ book.cover_image.url }}" alt="{{ book.title }}" loading="lazy"
-                     class="w-full h-40 object-contain">
-            </a>
-            {% else %}
-            <div class="h-40 bg-gray-100 border-b border-gray-100 flex items-center justify-center text-gray-400 text-xs font-bold uppercase tracking-wider">
-                <span>📕 {{ book.month_name }}</span>
+            <!-- Обложка с сердечком: кнопка вне <a>, иначе клик по сердцу
+                 открыл бы страницу книги вместо смены выбора -->
+            <div class="relative">
+                {% if book.cover_image %}
+                <a href="{% url 'book_detail' book.pk %}" class="block bg-gray-100 border-b border-gray-100">
+                    <img src="{{ book.cover_image.url }}" alt="{{ book.title }}" loading="lazy"
+                         class="w-full h-40 object-contain">
+                </a>
+                {% else %}
+                <div class="h-40 bg-gray-100 border-b border-gray-100 flex items-center justify-center text-gray-400 text-xs font-bold uppercase tracking-wider">
+                    <span>📕 {{ book.month_name }}</span>
+                </div>
+                {% endif %}
+
+                <div class="absolute top-2 right-2">
+                    {% include 'club/_heart_button.html' with book=book is_favorite=book.is_favorite %}
+                </div>
             </div>
-            {% endif %}
 
             <div class="p-6 flex-grow flex flex-col justify-between">
                 <div>

@@ -1,85 +1,25 @@
 # Python
-__pycache__
-*.pyc
-*.pyo
-*.pyd
+__pycache__/
 *.py[cod]
-*$py.class
-.python-version
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
 
-# Virtual Environment
-*.env
-.venv
-../.venv
-venv
-env
-ENV
-.env.local
-
-# Logs
-logs/
-*.log
-
-# Media
+# База и загруженные файлы: в образ им нельзя, на сервере они живут в томах.
+# Иначе на сервер уехала бы локальная dev-база вместе с тестовыми данными.
+*.sqlite3
+*.sqlite3-*
+db.sqlite3*
 media/
-nginx/
-# Static
-static/
-fixtures/
-tests/
-data/
-infra/
+staticfiles/
 
-observability/
-docs/
-shell_scripts/
-pytest.ini
-
-# Private keys and certificates
-*.pem
-
-# Git
-.git
-.gitignore
-
-.pre-commit-config.yaml
-
-
-# IDE / Editor
-*.swp
-*.swo
-*.bak
-*.tmp
-*.DS_Store
+# Прочее
 .idea/
 .vscode/
-.pytest_cache/
-pytest.json
-coverage.xml
-htmlcov/
-*.sqlite3
+*.log
+.env
+.env.*
+!.env.example
 *.md
-.run
-.python-version
-.ruff_cache
-
-# Docker
-*.yml
-*.yaml
-Dockerfile
-Dockerfile-Local
-.dockerignore
-Makefile
-
-
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn.lock
-package-lock.json
-
-# OS Generated Files
-Thumbs.db
-ehthumbs.db
-Desktop.ini

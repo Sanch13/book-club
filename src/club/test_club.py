@@ -1,10 +1,11 @@
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 from zoneinfo import ZoneInfo
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.utils import IntegrityError
 from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
@@ -14,12 +15,13 @@ from club.models import (
     MONTH_CHOICES,
     Book,
     BookAttachment,
+    Favorite,
     Meeting,
     Review,
     ReviewComment,
     Vote,
 )
-from club.templatetags.club_tags import rating_scale
+from club.templatetags.club_tags import rating_scale, ru_plural
 from user.models import User, WhitelistEmail, normalize_email
 
 MSK = ZoneInfo('Europe/Moscow')
@@ -231,6 +233,13 @@ class TestRussianDates:
 
     def test_templates_render_russian_dates(self, client):
         user = User.objects.create_user(email='dates@miran.local', password='password')
+        # Дата в будущем: главная показывает только предстоящие встречи,
+        # поэтому фиксированная дата «протухала» бы на следующий день.
+        when = (timezone.localtime() + timedelta(days=3)).replace(
+            hour=14, minute=30, second=0, microsecond=0
+        )
+        expected = format_datetime(when)
+
         book = Book.objects.create(
             month=10,
             title='Книга',
@@ -239,19 +248,19 @@ class TestRussianDates:
         )
         review = Review.objects.create(book=book, user=user, text='Отзыв')
         # created_at — auto_now_add, поэтому задаётся только через UPDATE
-        Review.objects.filter(pk=review.pk).update(created_at=moscow(2026, 10, 8, 14, 30))
+        Review.objects.filter(pk=review.pk).update(created_at=when)
         Meeting.objects.create(
             title='Встреча',
-            date_time=moscow(2026, 10, 8, 14, 30),
+            date_time=when,
             location='Zoom'
         )
         client.force_login(user)
 
         detail = client.get(reverse('book_detail', args=[book.pk])).content.decode()
-        assert '8 октября 2026, 14:30' in detail
+        assert expected in detail
 
         index = client.get(reverse('index')).content.decode()
-        assert '8 октября 2026, 14:30' in index
+        assert expected in index
 
     def test_book_detail_badge_uses_book_year(self, client):
         """Год в бейдже берётся из модели, а не захардкожен."""
@@ -329,6 +338,19 @@ class TestReviewComments:
         # по одному textarea комментария на каждый отзыв
         comment_textareas = re.findall(r'Напишите комментарий к отзыву', html)
         assert len(comment_textareas) == 2
+
+    @pytest.mark.parametrize(('n', 'word'), [
+        (0, 'книг'), (1, 'книга'), (2, 'книги'), (4, 'книги'), (5, 'книг'),
+        (11, 'книг'), (12, 'книг'), (14, 'книг'), (21, 'книга'), (22, 'книги'),
+        (25, 'книг'), (101, 'книга'), (111, 'книг'), (1000, 'книг'),
+    ])
+    def test_ru_plural_forms(self, n, word):
+        assert ru_plural(n, 'книга,книги,книг') == word
+
+    def test_ru_plural_tolerates_garbage(self):
+        """Битое значение не должно ронять страницу — отдаём форму множественного числа."""
+        assert ru_plural(None, 'книга,книги,книг') == 'книг'
+        assert ru_plural('abc', 'книга,книги,книг') == 'книг'
 
     def test_comments_of_other_review_not_shown(self, client, book):
         """Комментарии не должны протекать между отзывами одной книги."""
@@ -461,6 +483,126 @@ class TestHeaderLogo:
 
 
 @pytest.mark.django_db
+class TestHeaderYearMenu:
+    """Выпадающий список годов в шапке: активный пункт и галочка."""
+
+    @pytest.fixture
+    def user(self):
+        return User.objects.create_user(email='menu@miran.local', password='p')
+
+    @pytest.fixture
+    def books(self):
+        year = timezone.now().year
+        return [
+            Book.objects.create(year=year, month=1, title='Эта', author='А',
+                                short_description='D'),
+            Book.objects.create(year=year - 1, month=1, title='Прошлая', author='А',
+                                short_description='D'),
+        ]
+
+    def _marked_year(self, html):
+        """Какой год отмечен в шапке.
+
+        Возвращает строку года, 'all' для пункта «Все годы»
+        или None, если не отмечен никто.
+        """
+        nav = re.search(r'<nav class="hidden md:flex.*?</nav>', html, re.DOTALL)
+        assert nav, 'В шапке нет навигации'
+
+        # aria-current="page" есть только у отмеченного пункта года, поэтому
+        # искать его прямо в навигации можно — вырезать выпадающий список
+        # не нужно (внутри есть <div>разделитель, который обрывает вложенность)
+        for tag in re.findall(
+            r'<a href="[^"]*"[^>]*aria-current="page"[^>]*>.*?</a>',
+            nav.group(0),
+            re.DOTALL,
+        ):
+            if 'Все годы' in tag:
+                return 'all'
+            year = re.search(r'(\d{4})', tag)
+            if year:
+                return year.group(1)
+        return None
+
+    def test_index_marks_current_year(self, client, user, books):
+        """На главной галочка стоит на текущем календарном году."""
+        client.force_login(user)
+        html = client.get(reverse('index')).content.decode()
+
+        assert self._marked_year(html) == str(timezone.now().year)
+        assert 'aria-current="page"' in html
+
+    def test_index_falls_back_to_latest_year_with_books(self, client, user, books):
+        """Если книг за текущий год нет, отмечается год, где они есть."""
+        Book.objects.filter(year=timezone.now().year).delete()
+
+        client.force_login(user)
+        html = client.get(reverse('index')).content.decode()
+        assert self._marked_year(html) == str(timezone.now().year - 1)
+
+    def test_book_list_marks_its_year(self, client, user, books):
+        client.force_login(user)
+        html = client.get(
+            reverse('book_list_year', args=[timezone.now().year - 1])
+        ).content.decode()
+
+        assert self._marked_year(html) == str(timezone.now().year - 1)
+
+    def test_all_years_page_marks_all_years(self, client, user, books):
+        client.force_login(user)
+        response = client.get(reverse('book_list'))
+
+        assert response.context['all_years'] is True
+        html = response.content.decode()
+        # отмечен именно «Все годы», а не какой-то конкретный год
+        assert self._marked_year(html) == 'all'
+
+    def test_book_detail_marks_current_year(self, client, user, books):
+        """На странице книги год не задан вьюхом — пункт всё равно выбран."""
+        client.force_login(user)
+        html = client.get(reverse('book_detail', args=[books[0].pk])).content.decode()
+
+        assert self._marked_year(html) == str(timezone.now().year)
+
+    def test_profile_marks_current_year(self, client, user, books):
+        client.force_login(user)
+        html = client.get(reverse('profile')).content.decode()
+        assert self._marked_year(html) == str(timezone.now().year)
+
+    def test_favorites_page_marks_current_year(self, client, user, books):
+        client.force_login(user)
+        html = client.get(reverse('favorites_ranking')).content.decode()
+        assert self._marked_year(html) == str(timezone.now().year)
+
+    def test_no_year_in_dropdown_when_no_books(self, client, user):
+        """Без книг в списке нет и строки с галочкой — перечислять нечего."""
+        client.force_login(user)
+        html = client.get(reverse('index')).content.decode()
+
+        assert 'Выбрать год' not in html
+
+    def test_favorites_is_separate_menu_item(self, client, user, books):
+        """«Любимые» — отдельный пункт меню, а не строка внутри списка годов."""
+        client.force_login(user)
+        html = client.get(reverse('index')).content.decode()
+
+        label = '\u0421\u0430\u043c\u0430\u044f \u043b\u044e\u0431\u0438\u043c\u0430\u044f \u043a\u043d\u0438\u0433\u0430'
+        assert label in html
+        # пункт стоит рядом с «Главная», а не внутри выпадающего списка книг
+        nav = re.search(r'<nav class="hidden md:flex.*?</nav>', html, re.DOTALL).group(0)
+        dropdown = re.search(r'<div x-show="open".*?overflow-hidden">.*?</div>', nav, re.DOTALL).group(0)
+        assert label not in dropdown
+
+    def test_mobile_menu_shows_favorite_item(self, client, user, books):
+        client.force_login(user)
+        html = client.get(reverse('index')).content.decode()
+
+        burger = re.search(r'<div x-data="\{ open: false \}" class="md:hidden.*?</div>\s*</div>',
+                           html, re.DOTALL)
+        assert burger and '\u0421\u0430\u043c\u0430\u044f \u043b\u044e\u0431\u0438\u043c\u0430\u044f \u043a\u043d\u0438\u0433\u0430' in burger.group(0)
+
+
+@pytest.mark.django_db
 class TestBookListByYear:
     @pytest.fixture
     def user(self):
@@ -580,15 +722,6 @@ class TestIndexFilteredByCurrentYear:
         client.force_login(user)
         response = client.get(reverse('index'))
         assert response.context['year'] == now_year
-
-    def test_total_books_count_only_current_year(self, client, user, now_year):
-        for year in (now_year, now_year - 1, now_year + 1):
-            Book.objects.create(year=year, month=1, title=f'Книга {year}',
-                                author='Автор', short_description='D')
-
-        client.force_login(user)
-        response = client.get(reverse('index'))
-        assert response.context['total_books_count'] == 1
 
     def test_top_books_exclude_other_years(self, client, user, now_year):
         old_book = Book.objects.create(year=now_year - 1, month=1, title='Старая книга',
@@ -749,8 +882,7 @@ class TestIndexFilteredByCurrentYear:
         client.force_login(user)
         response = client.get(reverse('index'))
 
-        # счётчик главной — только текущий год, но карточка рейтинга прошлого года есть
-        assert response.context['total_books_count'] == 0
+        # карточка рейтинга прошлого года остаётся, счётчика книг на главной больше нет
         assert [card['year'] for card in response.context['rating_cards']] == [now_year - 5]
 
     def test_index_has_no_hardcoded_year(self, client, user, now_year):
@@ -766,15 +898,16 @@ class TestIndexFilteredByCurrentYear:
         template = Path(settings.BASE_DIR) / 'templates' / 'club' / 'index.html'
         source = template.read_text(encoding='utf-8')
 
-        assert 'Книг в программе {{ year }}' in source
-        assert 'Читай 12 книг {{ year }} года' in source
+        assert 'Читай {{ books_count }}' in source
         assert "url 'book_list_year' year" in source
         # литерал 2026 в разметке главной больше встречаться не должен
         assert '2026' not in source
 
         client.force_login(user)
-        html = client.get(reverse('index')).content.decode()
-        assert f'Книг в программе {now_year}' in html
+        response = client.get(reverse('index'))
+        count = response.context['books_count']
+        html = response.content.decode()
+        assert f'Читай {count} ' in html
         assert reverse('book_list_year', args=[now_year]) in html
 
     def test_index_cta_leads_to_current_year_list(self, client, user, now_year):
@@ -1416,7 +1549,7 @@ class TestHeroBanner:
         assert 'object-cover' in img
 
     def test_banner_keeps_dynamic_content(self, client, user):
-        """Год и счётчик остаются в HTML — картинка их не заменяет."""
+        """Год и ссылка остаются в HTML — картинка их не заменяет."""
         Book.objects.create(year=timezone.now().year, month=1, title='Книга',
                             author='Автор', short_description='D')
         client.force_login(user)
@@ -1424,7 +1557,33 @@ class TestHeroBanner:
 
         assert 'Смотреть книги' in html
         assert str(timezone.now().year) in html
-        assert 'Книг в программе' in html
+        assert 'Добро пожаловать' in html
+        # счётчик книг из баннера убран по требованию заказчика
+        assert 'Книг в программе' not in html
+
+    def test_banner_book_count_matches_current_year(self, client, user):
+        """Число книг в тексте баннера берётся из БД, а не зашито в шаблон."""
+        year = timezone.now().year
+        for month in range(1, 5):
+            Book.objects.create(year=year, month=month, title=f'Книга {month}',
+                                author='Автор', short_description='D')
+        Book.objects.create(year=year - 3, month=1, title='Прошлый год',
+                            author='Автор', short_description='D')
+
+        client.force_login(user)
+        response = client.get(reverse('index'))
+
+        assert response.context['books_count'] == 4
+        assert 'Читай 4 книги' in response.content.decode()
+
+    def test_banner_book_count_is_one_when_single_book(self, client, user):
+        """Одна книга — «1 книга», а не «1 книг»."""
+        Book.objects.create(year=timezone.now().year, month=1, title='Одна',
+                            author='Автор', short_description='D')
+
+        client.force_login(user)
+        response = client.get(reverse('index'))
+        assert 'Читай 1 книга' in response.content.decode()
 
     def test_banner_files_exist(self):
         from django.conf import settings
@@ -1446,6 +1605,229 @@ class TestHeroBanner:
             assert desktop.size == (2480, 544)
         with Image.open(base / 'hero-mobile.jpg') as mobile:
             assert mobile.size == (800, 1250)
+
+
+@pytest.mark.django_db
+class TestFavoriteBook:
+    """Сердечко «самая любимая книга»: одна на пользователя, переносится."""
+
+    @pytest.fixture
+    def user(self):
+        return User.objects.create_user(email='fav@miran.local', password='p')
+
+    @pytest.fixture
+    def other_user(self):
+        return User.objects.create_user(email='fav2@miran.local', password='p')
+
+    @pytest.fixture
+    def book(self):
+        return Book.objects.create(year=2026, month=1, title='Книга',
+                                    author='Автор', short_description='D')
+
+    def test_heart_sets_favorite(self, client, user, book):
+        client.force_login(user)
+        response = client.post(reverse('toggle_favorite', args=[book.pk]))
+
+        assert response.status_code == 302
+        assert user.favorite.book_id == book.pk
+
+    def test_second_book_moves_heart_from_first(self, client, user, book):
+        """Главный сценарий: передумал — сердечко переехало, старое снято."""
+        second = Book.objects.create(year=2026, month=2, title='Другая',
+                                     author='Автор', short_description='D')
+        client.force_login(user)
+        client.post(reverse('toggle_favorite', args=[book.pk]))
+        client.post(reverse('toggle_favorite', args=[second.pk]))
+
+        assert user.favorite.book_id == second.pk
+        # у книги должно быть ровно 0 сердечек, а не 1 у первой и 1 у второй
+        assert book.favorited_by.count() == 0
+        assert second.favorited_by.count() == 1
+        assert Favorite.objects.filter(user=user).count() == 1
+
+    def test_repeated_click_removes_heart(self, client, user, book):
+        client.force_login(user)
+        client.post(reverse('toggle_favorite', args=[book.pk]))
+        client.post(reverse('toggle_favorite', args=[book.pk]))
+
+        assert not Favorite.objects.filter(user=user).exists()
+        assert book.favorited_by.count() == 0
+
+    def test_user_cannot_have_two_favorites_in_db(self, user, book):
+        """Ограничение «одна на пользователя» держит сама БД, а не код."""
+        second = Book.objects.create(year=2026, month=3, title='Третья',
+                                     author='Автор', short_description='D')
+        Favorite.objects.create(user=user, book=book)
+
+        with pytest.raises(IntegrityError):
+            Favorite.objects.create(user=user, book=second)
+
+    def test_others_hearts_counted_separately(self, client, user, other_user, book):
+        """Сердечки разных участников не мешают друг другу."""
+        client.force_login(user)
+        client.post(reverse('toggle_favorite', args=[book.pk]))
+        client.force_login(other_user)
+        client.post(reverse('toggle_favorite', args=[book.pk]))
+
+        assert book.favorited_by.count() == 2
+        assert user.favorite.book_id == book.pk
+        assert other_user.favorite.book_id == book.pk
+
+    def test_toggle_requires_post(self, client, user, book):
+        """Переход по ссылке не должен менять выбор: только POST."""
+        client.force_login(user)
+        response = client.get(reverse('toggle_favorite', args=[book.pk]))
+
+        assert response.status_code == 405
+        assert not Favorite.objects.filter(user=user).exists()
+
+    def test_toggle_requires_login(self, client, book):
+        response = client.post(reverse('toggle_favorite', args=[book.pk]))
+        assert response.status_code == 302
+        assert not Favorite.objects.exists()
+
+    def test_toggle_unknown_book_404(self, client, user):
+        client.force_login(user)
+        assert client.post(reverse('toggle_favorite', args=[99999])).status_code == 404
+
+    def test_redirects_back_to_page_it_came_from(self, client, user, book):
+        """После нажатия на карточке списка возвращаем в список, а не на страницу книги."""
+        client.force_login(user)
+        response = client.post(
+            reverse('toggle_favorite', args=[book.pk]),
+            {'next': reverse('book_list')},
+        )
+        assert response.url == reverse('book_list')
+
+    def test_redirect_ignores_foreign_next_url(self, client, user, book):
+        """Чужой адрес в ?next= не должен превращаться в открытый редирект."""
+        client.force_login(user)
+        response = client.post(
+            reverse('toggle_favorite', args=[book.pk]),
+            {'next': 'https://evil.example/steal'},
+        )
+        assert 'evil.example' not in response.url
+        assert response.url == reverse('book_detail', args=[book.pk])
+
+    def test_heart_filled_on_own_book_page(self, client, user, book):
+        client.force_login(user)
+        client.post(reverse('toggle_favorite', args=[book.pk]))
+
+        html = client.get(reverse('book_detail', args=[book.pk])).content.decode()
+        assert 'aria-pressed="true"' in html
+        assert 'fill="currentColor"' in html
+
+    def test_heart_outline_when_no_favorite(self, client, user, book):
+        client.force_login(user)
+        html = client.get(reverse('book_detail', args=[book.pk])).content.decode()
+        assert 'aria-pressed="false"' in html
+
+    def test_heart_count_shown_on_book_page(self, client, user, other_user, book):
+        client.force_login(user)
+        client.post(reverse('toggle_favorite', args=[book.pk]))
+        client.force_login(other_user)
+        client.post(reverse('toggle_favorite', args=[book.pk]))
+
+        html = client.get(reverse('book_detail', args=[book.pk])).content.decode()
+        assert '2 участника' in html
+
+    def test_book_list_shows_own_heart_state(self, client, user, book):
+        client.force_login(user)
+        client.post(reverse('toggle_favorite', args=[book.pk]))
+
+        html = client.get(reverse('book_list')).content.decode()
+        assert 'aria-pressed="true"' in html
+
+    def test_ranking_orders_by_hearts_then_title(self, client, user, book):
+        """Равные сердечки не должны «прыгать»: вторичный ключ — алфавит."""
+        alpha = Book.objects.create(year=2026, month=2, title='Альфа',
+                                    author='Автор', short_description='D')
+        beta = Book.objects.create(year=2026, month=3, title='Бета',
+                                   author='Автор', short_description='D')
+        def heart(book_pk):
+            # отдельный email на каждого: пользователь с одним адресом
+            # перестал бы быть отдельным участником с отдельным сердечком
+            fan = User.objects.create_user(
+                email=f'fan{len(Favorite.objects.all())}@miran.local', password='p'
+            )
+            client.force_login(fan)
+            client.post(reverse('toggle_favorite', args=[book_pk]))
+
+        for _ in range(3):
+            heart(book.pk)
+        for _ in range(2):
+            heart(alpha.pk)
+        heart(beta.pk)
+
+        client.force_login(user)
+        response = client.get(reverse('favorites_ranking'))
+
+        titles = [b.title for b in response.context['books']]
+        assert titles[0] == 'Книга'          # 3 сердечка
+        assert titles[1:3] == ['Альфа', 'Бета']  # по 2, дальше по алфавиту
+        assert response.context['books'][0].hearts == 3
+
+    def test_ranking_lists_only_hearted_books(self, client, user):
+        Book.objects.create(year=2026, month=1, title='Без сердечек',
+                            author='Автор', short_description='D')
+        client.force_login(user)
+        response = client.get(reverse('favorites_ranking'))
+
+        assert list(response.context['books']) == []
+
+    def test_ranking_empty_page_has_prompt(self, client, user):
+        client.force_login(user)
+        html = client.get(reverse('favorites_ranking')).content.decode()
+
+        assert 'Пока никто не отметил' in html
+        assert 'список книг' in html
+
+    def test_ranking_shows_who_marked_what(self, client, user, book):
+        client.force_login(user)
+        client.post(reverse('toggle_favorite', args=[book.pk]))
+
+        html = client.get(reverse('favorites_ranking')).content.decode()
+        assert 'Кто что отметил' in html
+        assert 'fav@miran.local' in html
+
+    def test_ranking_shows_my_choice(self, client, user, book):
+        client.force_login(user)
+        client.post(reverse('toggle_favorite', args=[book.pk]))
+
+        html = client.get(reverse('favorites_ranking')).content.decode()
+        assert 'Мой выбор' in html
+        assert 'Сейчас ваша любимая книга' in html
+
+    def test_ranking_prompts_when_no_choice(self, client, user):
+        client.force_login(user)
+        html = client.get(reverse('favorites_ranking')).content.decode()
+        assert 'Вы ещё не выбрали любимую книгу' in html
+
+    def test_ranking_requires_login(self, client):
+        response = client.get(reverse('favorites_ranking'))
+        assert response.status_code == 302
+
+    def test_nav_links_to_ranking(self, client, user):
+        client.force_login(user)
+        html = client.get(reverse('index')).content.decode()
+        assert reverse('favorites_ranking') in html
+
+    def test_clearing_favorite_when_book_deleted(self, user, book):
+        """Удаление книги не должно оставлять осиротевшее сердечко."""
+        pk = book.pk
+        book.delete()
+        assert not Favorite.objects.filter(book_id=pk).exists()
+
+    def test_clearing_favorite_when_user_deleted(self, user, book):
+        Favorite.objects.create(user=user, book=book)
+        user.delete()
+        assert not Favorite.objects.exists()
+
+    def test_str_shows_user_and_book(self, user, book):
+        user.first_name, user.last_name = 'Иван', 'Петров'
+        favorite = Favorite.objects.create(user=user, book=book)
+        assert 'Петров Иван' in str(favorite)
+        assert book.title in str(favorite)
 
 
 @pytest.mark.django_db
