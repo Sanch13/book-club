@@ -23,6 +23,11 @@ media/
 shell_scripts/
 
 # Сборка статики (collectstatic). Исходники в static/ — под git.
+# В проде каталог и так пересобирается entrypoint'ом в Docker volume.
+/staticfiles/
+
+# Локальные бэкапы базы (make backup)
+/backups/
 
 # pyenv
 .python-version
@@ -64,6 +69,8 @@ cover/
 ehthumbs.db
 Thumbs.db
 *.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
 
 .idea/
 .vscode/

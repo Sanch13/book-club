@@ -147,6 +147,30 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Хешированные имена файлов: hero-miran.jpg попадает в сборку как
+# hero-miran.a1b2c3d4.jpg. Имя меняется при изменении содержимого, поэтому
+# nginx с `expires 30d` (nginx/nginx.conf) перестаёт годами отдавать
+# пользователям устаревшую версию файла.
+#
+# Следствие: манифест обязан существовать в STATIC_ROOT к моменту старта
+# gunicorn, иначе {% static %} на любой странице падает с ValueError.
+# Собирает его entrypoint (docker/entrypoint.sh) до exec gunicorn.
+# Локальная разработка при DEBUG=True манифест не читает — Django отдаёт
+# статику напрямую из finders.
+#
+# ВАЖНО: collectstatic НЕ проверяет {% static %} в шаблонах. Ссылка на
+# несуществующий файл проходит сборку молча, а падает уже при рендере.
+# Единственная защита — тесты: conftest.py собирает статику перед прогоном,
+# из-за чего такая ошибка валит тест, а не прод.
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage',
+    },
+}
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.environ.get('MEDIA_ROOT') or BASE_DIR / 'media'
 

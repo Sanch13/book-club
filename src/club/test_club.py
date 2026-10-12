@@ -441,6 +441,8 @@ class TestReviewComments:
 @pytest.mark.django_db
 class TestHeaderLogo:
     def test_header_shows_logo_instead_of_miran_badge(self, client):
+        from django.templatetags.static import static
+
         user = User.objects.create_user(email='logo@miran.local', password='password')
         book = Book.objects.create(
             month=3, title='Книга', author='Автор', short_description='Описание'
@@ -449,11 +451,15 @@ class TestHeaderLogo:
         client.force_login(user)
         html = client.get(reverse('book_detail', args=[book.pk])).content.decode()
 
-        assert 'images/logo.png' in html
+        # Через static(), а не строкой: включён ManifestStaticFilesStorage,
+        # поэтому в разметке имя с хешем — images/logo.<hash>.png.
+        assert static('images/logo.png') in html
         assert '>MIRAN<' not in html
 
     def test_logo_url_is_absolute(self, client):
         """Относительный src сломался бы на вложенных URL (/books/1/)."""
+        from django.templatetags.static import static
+
         user = User.objects.create_user(email='logo2@miran.local', password='password')
         book = Book.objects.create(
             month=4, title='Книга', author='Автор', short_description='Описание'
@@ -461,8 +467,9 @@ class TestHeaderLogo:
         client.force_login(user)
 
         html = client.get(reverse('book_detail', args=[book.pk])).content.decode()
-        src = re.search(r'<img[^>]*src="([^"]*logo\.png)"', html).group(1)
-        assert src.startswith('/static/')
+        logo_url = static('images/logo.png')
+        assert logo_url.startswith('/static/')
+        assert f'src="{logo_url}"' in html
 
     def test_logo_file_exists(self):
         from django.conf import settings
@@ -1392,9 +1399,11 @@ class TestAdminYearTabs:
 
     def test_stylesheet_is_shipped(self, admin_client, books):
         from django.conf import settings
+        from django.templatetags.static import static
 
         html = admin_client.get('/admin/club/book/').content.decode()
-        assert 'admin_year_tabs.css' in html
+        # Имя с хешем: static() возвращает club/admin_year_tabs.<hash>.css
+        assert static('club/admin_year_tabs.css') in html
         assert (settings.BASE_DIR / 'static' / 'club' / 'admin_year_tabs.css').exists()
 
     def test_single_year_admin_still_shows_tabs(self, admin_client):
@@ -1530,21 +1539,32 @@ class TestHeroBanner:
         return User.objects.create_user(email='hero@miran.local', password='p')
 
     def test_banner_uses_picture_with_both_images(self, client, user):
+        from django.templatetags.static import static
+
         client.force_login(user)
         html = client.get(reverse('index')).content.decode()
 
-        assert 'hero-desktop.jpg' in html
-        assert 'hero-mobile.jpg' in html
+        # Через static(), а не строкой: ManifestStaticFilesStorage хеширует
+        # имена, в разметке hero-miran.<hash>.jpg. Заодно static() падает с
+        # ValueError, если файла нет — ровно тот случай, который collectstatic
+        # молча пропускает, а прод поймал бы 500-кой.
+        desktop = static('images/hero-miran.jpg')
+        mobile = static('images/hero-miran-mobile.jpg')
+        assert desktop in html
+        assert mobile in html
         # мобильный вариант отдаётся через media-атрибут
-        assert re.search(r'<source[^>]*hero-mobile\.jpg[^>]*>', html)
+        assert re.search(r'<source[^>]*' + re.escape(mobile) + r'[^>]*>', html)
         assert '<picture>' in html
 
     def test_banner_image_is_decorative(self, client, user):
         """Баннер — украшение, поэтому alt пустой."""
+        from django.templatetags.static import static
+
         client.force_login(user)
         html = client.get(reverse('index')).content.decode()
 
-        img = re.search(r'<img[^>]*hero-desktop\.jpg[^>]*>', html).group(0)
+        desktop = re.escape(static('images/hero-miran.jpg'))
+        img = re.search(r'<img[^>]*' + desktop + r'[^>]*>', html).group(0)
         assert 'alt=""' in img
         assert 'object-cover' in img
 
@@ -1589,22 +1609,25 @@ class TestHeroBanner:
         from django.conf import settings
 
         base = settings.BASE_DIR / 'static' / 'images'
-        assert (base / 'hero-desktop.jpg').exists()
-        assert (base / 'hero-mobile.jpg').exists()
+        assert (base / 'hero-miran.jpg').exists()
+        assert (base / 'hero-miran-mobile.jpg').exists()
 
     def test_banner_image_sizes_match_measured_banner(self):
         """Размеры подобраны под реальные пропорции баннера в браузере.
 
-        Десктоп 1240x272 (4.56:1) и мобильный 353x564 (0.63:1) — в 2x.
+        Десктоп 1240x272 (4.56:1) — ровно 1× к ширине контейнера
+        (max-w-7xl минус горизонтальные отступы ≈ 1248px), поэтому на Retina
+        кадр будет мягче; пропорция важнее плотности пикселей.
+        Мобильный 853x1280 (0.67:1) — с запасом по вертикали.
         """
         from django.conf import settings
         from PIL import Image
 
         base = settings.BASE_DIR / 'static' / 'images'
-        with Image.open(base / 'hero-desktop.jpg') as desktop:
-            assert desktop.size == (2480, 544)
-        with Image.open(base / 'hero-mobile.jpg') as mobile:
-            assert mobile.size == (800, 1250)
+        with Image.open(base / 'hero-miran.jpg') as desktop:
+            assert desktop.size == (1240, 272)
+        with Image.open(base / 'hero-miran-mobile.jpg') as mobile:
+            assert mobile.size == (853, 1280)
 
 
 @pytest.mark.django_db

@@ -14,7 +14,10 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev --no-install-project --frozen
 
 
-FROM python:3.13-slim AS runtime
+# Базовый образ запинен по digest: тег python:3.13-slim плавающий, и
+# пересборка в другой день дала бы другое окружение. Multi-arch индекс
+# сохранён, поэтому сборка работает и на arm64.
+FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f AS runtime
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
