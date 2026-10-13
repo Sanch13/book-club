@@ -3,6 +3,7 @@ from django.contrib.auth import password_validation
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
 
 from .models import User, WhitelistEmail, normalize_email
+from .widgets import PasswordToggleInput
 
 EMAIL_INPUT_ATTRS = {
     'class': 'w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A2D813]',
@@ -33,7 +34,7 @@ class LoginForm(AuthenticationForm):
     )
     password = forms.CharField(
         label='Пароль',
-        widget=forms.PasswordInput(attrs=PASSWORD_INPUT_ATTRS),
+        widget=PasswordToggleInput(attrs=PASSWORD_INPUT_ATTRS),
     )
 
     def clean_username(self):
@@ -47,7 +48,7 @@ class RegistrationForm(forms.Form):
     email = forms.EmailField(label='Email', widget=forms.EmailInput(attrs=EMAIL_INPUT_ATTRS))
     password = forms.CharField(
         label='Пароль',
-        widget=forms.PasswordInput(attrs=NEW_PASSWORD_INPUT_ATTRS),
+        widget=PasswordToggleInput(attrs=NEW_PASSWORD_INPUT_ATTRS),
     )
 
     def clean_email(self):
@@ -114,11 +115,11 @@ class ProfilePasswordForm(PasswordChangeForm):
         field_order = ('old_password', 'new_password1', 'new_password2')
         self.order_fields(field_order)
         attrs = PASSWORD_INPUT_ATTRS | {'autocomplete': 'current-password'}
-        self.fields['old_password'].widget = forms.PasswordInput(attrs=attrs)
-        self.fields['new_password1'].widget = forms.PasswordInput(
+        self.fields['old_password'].widget = PasswordToggleInput(attrs=attrs)
+        self.fields['new_password1'].widget = PasswordToggleInput(
             attrs=NEW_PASSWORD_INPUT_ATTRS
         )
-        self.fields['new_password2'].widget = forms.PasswordInput(
+        self.fields['new_password2'].widget = PasswordToggleInput(
             attrs=NEW_PASSWORD_INPUT_ATTRS | {'placeholder': 'Повторите пароль'}
         )
         for name, label in (
